@@ -14,7 +14,7 @@
 import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc,
          getDocs, deleteDoc, doc, query,
-         orderBy }                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+         orderBy, updateDoc }                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── Firebase config ──────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -36,6 +36,8 @@ let selectedCulpa = '';
 let selectedTipos = [];
 let activeMonth   = 'all';
 let chartCulpa, chartDia;
+let editSelectedCulpa = '';
+let editSelectedTipos = [];
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -145,6 +147,99 @@ window.deleteErro = async function(firestoreId) {
   }
 };
 
+
+// ── Edit registro ─────────────────────────────────────────────────────────────
+window.editErro = function(firestoreId) {
+  const e = erros.find(r => r.firestoreId === firestoreId);
+  if (!e) return;
+
+  // Populate modal fields
+  document.getElementById('edit-id').value         = firestoreId;
+  document.getElementById('edit-data').value        = e.data || '';
+  document.getElementById('edit-nf').value          = e.nf !== '—' ? e.nf : '';
+  document.getElementById('edit-justif').value      = e.justif || '';
+  document.getElementById('edit-resp').value        = e.resp !== '—' ? e.resp : '';
+
+  // Culpa buttons
+  editSelectedCulpa = e.culpa || '';
+  document.querySelectorAll('.edit-culpa-btn').forEach(b => {
+    b.className = 'culpa-btn';
+    if (b.dataset.val === editSelectedCulpa)
+      b.classList.add('active-' + editSelectedCulpa.toLowerCase());
+  });
+
+  // Tipo tags
+  editSelectedTipos = e.tipo ? e.tipo.split(', ') : [];
+  document.querySelectorAll('.edit-tipo-tag').forEach(t => {
+    t.classList.toggle('selected', editSelectedTipos.includes(t.dataset.val));
+  });
+
+  document.getElementById('edit-modal').style.display = 'flex';
+};
+
+window.closeEditModal = function() {
+  document.getElementById('edit-modal').style.display = 'none';
+};
+
+window.saveEdit = async function() {
+  const firestoreId = document.getElementById('edit-id').value;
+  const data        = document.getElementById('edit-data').value;
+  const nf          = document.getElementById('edit-nf').value.trim();
+  const justif      = document.getElementById('edit-justif').value.trim();
+  const resp        = document.getElementById('edit-resp').value.trim();
+
+  if (!data)             return shake('edit-data',   'Informe a data da NF');
+  if (!editSelectedTipos.length) return showToastErr('Selecione ao menos um tipo de erro');
+  if (!editSelectedCulpa)        return showToastErr('Selecione a culpabilidade');
+  if (!justif)           return shake('edit-justif', 'Informe a justificativa');
+
+  const btnSave = document.getElementById('btn-save-edit');
+  btnSave.disabled = true;
+  btnSave.textContent = 'Salvando…';
+
+  const updates = {
+    data,
+    nf:    nf || '—',
+    tipo:  editSelectedTipos.join(', '),
+    culpa: editSelectedCulpa,
+    justif,
+    resp:  resp || '—',
+    editadoEm: new Date().toLocaleString('pt-BR')
+  };
+
+  try {
+    await updateDoc(doc(db, COL, firestoreId), updates);
+    const idx = erros.findIndex(r => r.firestoreId === firestoreId);
+    if (idx !== -1) erros[idx] = { ...erros[idx], ...updates };
+    closeEditModal();
+    renderAll();
+    showToast('Registro atualizado com sucesso!');
+  } catch (err) {
+    console.error(err);
+    showToastErr('Falha ao atualizar. Tente novamente.');
+  } finally {
+    btnSave.disabled = false;
+    btnSave.textContent = '💾 Salvar Alterações';
+  }
+};
+
+window.editSelectCulpa = function(btn) {
+  document.querySelectorAll('.edit-culpa-btn').forEach(b => b.className = 'culpa-btn');
+  editSelectedCulpa = btn.dataset.val;
+  btn.classList.add('active-' + editSelectedCulpa.toLowerCase());
+};
+
+window.editToggleTipo = function(el) {
+  const v = el.dataset.val;
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    editSelectedTipos = editSelectedTipos.filter(t => t !== v);
+  } else {
+    el.classList.add('selected');
+    editSelectedTipos.push(v);
+  }
+};
+
 // ── Reset form ───────────────────────────────────────────────────────────────
 function resetForm() {
   document.getElementById('f-data').value  = '';
@@ -212,7 +307,10 @@ function renderTable() {
       <td style="max-width:240px;font-size:12px;color:var(--text-muted);">${truncate(e.justif, 80)}</td>
       <td style="font-size:12px;">${e.resp}</td>
       <td style="font-size:11px;color:var(--text-muted);">${e.lancadoEm}</td>
-      <td><button class="btn-del" onclick="deleteErro('${e.firestoreId}')">🗑</button></td>
+      <td style="display:flex;gap:6px;align-items:center;">
+        <button class="btn-edit" onclick="editErro('${e.firestoreId}')" title="Editar">✏️</button>
+        <button class="btn-del"  onclick="deleteErro('${e.firestoreId}')" title="Excluir">🗑</button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -583,6 +681,25 @@ window.exportPDF = async function() {
   .badge-multimodal { background: var(--error-multi); }
   .btn-del { background: none; border: 1.5px solid #e0e4ee; border-radius: 5px; cursor: pointer; padding: 4px 8px; font-size: 12px; color: var(--text-muted); transition: all .15s; }
   .btn-del:hover { border-color: var(--error-csc); color: var(--error-csc); }
+  .btn-edit { background: none; border: 1.5px solid #e0e4ee; border-radius: 5px; cursor: pointer; padding: 4px 8px; font-size: 12px; color: var(--text-muted); transition: all .15s; }
+  .btn-edit:hover { border-color: var(--navy-light); color: var(--navy); background: rgba(26,58,107,0.06); }
+  /* Edit Modal */
+  .edit-modal-overlay { position: fixed; inset: 0; background: rgba(10,20,50,0.75); z-index: 500; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .edit-modal-overlay.open { display: flex; }
+  .edit-modal { background: var(--white); border-radius: 12px; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.35); animation: modalIn .2s ease; }
+  @keyframes modalIn { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:none; } }
+  .edit-modal-header { background: var(--navy); padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; border-radius: 12px 12px 0 0; }
+  .edit-modal-header h3 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; color: var(--white); text-transform: uppercase; letter-spacing: .5px; }
+  .edit-modal-header h3 span { color: var(--gold); }
+  .btn-close-modal { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: all .15s; }
+  .btn-close-modal:hover { color: var(--white); background: rgba(255,255,255,0.1); }
+  .edit-modal-body { padding: 22px; }
+  .edit-modal-footer { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+  .btn-save { background: var(--gold); color: var(--navy); border: none; padding: 10px 28px; border-radius: var(--radius); font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 14px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+  .btn-save:hover { background: var(--gold-light); }
+  .btn-save:disabled { opacity: .6; cursor: not-allowed; }
+  .btn-cancel { background: none; border: 1.5px solid var(--border); color: var(--text-muted); padding: 10px 20px; border-radius: var(--radius); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: all .15s; }
+  .btn-cancel:hover { border-color: var(--navy-light); color: var(--navy); }
   .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; }
   .empty-state svg { margin-bottom: 10px; opacity: .3; }
 
@@ -751,6 +868,60 @@ window.exportPDF = async function() {
     </div>
   </div>
 
+</div>
+
+
+<!-- ══ EDIT MODAL ══════════════════════════════════════════════════════════ -->
+<div class="edit-modal-overlay" id="edit-modal" onclick="if(event.target===this) closeEditModal()">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <h3>✏️ Editar <span>Registro</span></h3>
+      <button class="btn-close-modal" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <input type="hidden" id="edit-id">
+
+      <div class="form-group">
+        <label>Data da NF <span class="req">*</span></label>
+        <input type="date" id="edit-data" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Número da NF</label>
+        <input type="text" id="edit-nf" class="form-control" placeholder="Ex: 000123456">
+      </div>
+      <div class="form-group">
+        <label>Tipo do Erro <span class="req">*</span></label>
+        <div class="tipo-tags">
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Transportadora">Transportadora</span>
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Volume">Volume</span>
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Produto">Produto</span>
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Depósito">Depósito</span>
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Pedido">Pedido</span>
+          <span class="tipo-tag edit-tipo-tag" onclick="editToggleTipo(this)" data-val="Filial">Filial</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Culpabilidade <span class="req">*</span></label>
+        <div class="culpa-group">
+          <button class="culpa-btn edit-culpa-btn" data-val="CSC"        onclick="editSelectCulpa(this)">CSC</button>
+          <button class="culpa-btn edit-culpa-btn" data-val="Terminal"   onclick="editSelectCulpa(this)">Terminal</button>
+          <button class="culpa-btn edit-culpa-btn" data-val="Multimodal" onclick="editSelectCulpa(this)">Multimodal</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Justificativa <span class="req">*</span></label>
+        <textarea id="edit-justif" class="form-control" placeholder="Descreva o motivo do erro e a ação tomada…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Responsável</label>
+        <input type="text" id="edit-resp" class="form-control" placeholder="Nome do responsável">
+      </div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn-save" id="btn-save-edit" onclick="saveEdit()">💾 Salvar Alterações</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
