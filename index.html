@@ -1,4 +1,4 @@
-Fce<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -330,9 +330,9 @@ function initCharts() {
   chartCulpa = new Chart(ctxC, {
     type: 'doughnut',
     data: {
-      labels: ['CSC', 'Terminal', 'Multimodal'],
-      datasets: [{ data: [0, 0, 0],
-        backgroundColor: ['#e74c3c','#2980b9','#8e44ad'],
+      labels: ['CSC', 'Terminal', 'Multimodal', 'Logística', 'Comercial', 'Backoffice'],
+      datasets: [{ data: [0, 0, 0, 0, 0, 0],
+        backgroundColor: ['#e74c3c','#2980b9','#8e44ad','#27ae60','#d35400','#7f8c8d'],
         borderWidth: 3, borderColor: '#fff', hoverOffset: 8 }]
     },
     options: {
@@ -350,9 +350,12 @@ function initCharts() {
   chartDia = new Chart(ctxD, {
     type: 'bar',
     data: { labels: [], datasets: [
-      { label: 'CSC',       data: [], backgroundColor: '#e74c3c', borderRadius: 4 },
-      { label: 'Terminal',  data: [], backgroundColor: '#2980b9', borderRadius: 4 },
-      { label: 'Multimodal',data: [], backgroundColor: '#8e44ad', borderRadius: 4 },
+      { label: 'CSC',        data: [], backgroundColor: '#e74c3c', borderRadius: 4 },
+      { label: 'Terminal',   data: [], backgroundColor: '#2980b9', borderRadius: 4 },
+      { label: 'Multimodal', data: [], backgroundColor: '#8e44ad', borderRadius: 4 },
+      { label: 'Logística',  data: [], backgroundColor: '#27ae60', borderRadius: 4 },
+      { label: 'Comercial',  data: [], backgroundColor: '#d35400', borderRadius: 4 },
+      { label: 'Backoffice', data: [], backgroundColor: '#7f8c8d', borderRadius: 4 },
     ]},
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -373,7 +376,10 @@ function updateCharts() {
   const csc   = data.filter(e => e.culpa === 'CSC').length;
   const term  = data.filter(e => e.culpa === 'Terminal').length;
   const mult  = data.filter(e => e.culpa === 'Multimodal').length;
-  chartCulpa.data.datasets[0].data = [csc, term, mult];
+  const log   = data.filter(e => e.culpa === 'Logistica').length;
+  const com   = data.filter(e => e.culpa === 'Comercial').length;
+  const bko   = data.filter(e => e.culpa === 'Backoffice').length;
+  chartCulpa.data.datasets[0].data = [csc, term, mult, log, com, bko];
   chartCulpa.update();
 
   const dates = [...new Set(data.map(e => e.data))].sort();
@@ -381,6 +387,9 @@ function updateCharts() {
   chartDia.data.datasets[0].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'CSC').length);
   chartDia.data.datasets[1].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'Terminal').length);
   chartDia.data.datasets[2].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'Multimodal').length);
+  chartDia.data.datasets[3].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'Logistica').length);
+  chartDia.data.datasets[4].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'Comercial').length);
+  chartDia.data.datasets[5].data    = dates.map(d => data.filter(e => e.data === d && e.culpa === 'Backoffice').length);
   chartDia.update();
 }
 
@@ -465,19 +474,22 @@ window.exportPDF = async function() {
 
   // Summary
   const sumData = [
-    { label:'Total de Erros', val:data.length, color:[240,165,0] },
-    { label:'CSC',   val:data.filter(e=>e.culpa==='CSC').length,       color:[231,76,60]  },
-    { label:'Terminal', val:data.filter(e=>e.culpa==='Terminal').length,color:[41,128,185] },
-    { label:'Multimodal',val:data.filter(e=>e.culpa==='Multimodal').length,color:[142,68,173] }
+    { label:'Total de Erros',  val:data.length, color:[240,165,0] },
+    { label:'CSC',        val:data.filter(e=>e.culpa==='CSC').length,        color:[231,76,60]   },
+    { label:'Terminal',   val:data.filter(e=>e.culpa==='Terminal').length,   color:[41,128,185]  },
+    { label:'Multimodal', val:data.filter(e=>e.culpa==='Multimodal').length, color:[142,68,173]  },
+    { label:'Logística',  val:data.filter(e=>e.culpa==='Logistica').length,  color:[39,174,96]   },
+    { label:'Comercial',  val:data.filter(e=>e.culpa==='Comercial').length,  color:[211,84,0]    },
+    { label:'Backoffice', val:data.filter(e=>e.culpa==='Backoffice').length, color:[127,140,141] }
   ];
   sumData.forEach((s,i) => {
-    const x = 10 + i*50;
-    doc.setFillColor(248,249,252); doc.roundedRect(x,26,45,18,2,2,'F');
+    const x = 10 + i * 40;
+    doc.setFillColor(248,249,252); doc.roundedRect(x,26,36,18,2,2,'F');
     doc.setFillColor(...s.color); doc.roundedRect(x,26,3,18,1,1,'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...s.color);
-    doc.text(String(s.val), x+10, 37);
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,126);
-    doc.text(s.label.toUpperCase(), x+10, 41);
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...s.color);
+    doc.text(String(s.val), x+8, 37);
+    doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,126);
+    doc.text(s.label.toUpperCase(), x+8, 41);
   });
 
   // Charts
@@ -507,7 +519,10 @@ window.exportPDF = async function() {
   let cx = 10;
   cols.forEach(c => { doc.text(c.header, cx+2, startY+4.5); cx += c.w; });
 
-  const culpaColors = {CSC:[231,76,60],Terminal:[41,128,185],Multimodal:[142,68,173]};
+  const culpaColors = {
+    CSC:[231,76,60], Terminal:[41,128,185], Multimodal:[142,68,173],
+    Logistica:[39,174,96], Comercial:[211,84,0], Backoffice:[127,140,141]
+  };
   let rowY = startY + 7;
   data.forEach((e,i) => {
     if (rowY > H-15) { doc.addPage(); rowY = 15; }
@@ -653,6 +668,9 @@ window.exportPDF = async function() {
   .culpa-btn.active-csc { background: var(--error-csc); border-color: var(--error-csc); color: var(--white); }
   .culpa-btn.active-terminal { background: var(--error-term); border-color: var(--error-term); color: var(--white); }
   .culpa-btn.active-multimodal { background: var(--error-multi); border-color: var(--error-multi); color: var(--white); }
+  .culpa-btn.active-logistica { background: #27ae60; border-color: #27ae60; color: var(--white); }
+  .culpa-btn.active-comercial { background: #d35400; border-color: #d35400; color: var(--white); }
+  .culpa-btn.active-backoffice { background: #7f8c8d; border-color: #7f8c8d; color: var(--white); }
 
   .btn-submit { width: 100%; padding: 12px; background: var(--gold); color: var(--navy); border: none; border-radius: var(--radius); font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 15px; text-transform: uppercase; cursor: pointer; transition: background .15s, transform .1s; margin-top: 4px; }
   .btn-submit:hover { background: var(--gold-light); transform: translateY(-1px); }
@@ -679,6 +697,9 @@ window.exportPDF = async function() {
   .badge-csc { background: var(--error-csc); }
   .badge-terminal { background: var(--error-term); }
   .badge-multimodal { background: var(--error-multi); }
+  .badge-logistica { background: #27ae60; }
+  .badge-comercial { background: #d35400; }
+  .badge-backoffice { background: #7f8c8d; }
   .btn-del { background: none; border: 1.5px solid #e0e4ee; border-radius: 5px; cursor: pointer; padding: 4px 8px; font-size: 12px; color: var(--text-muted); transition: all .15s; }
   .btn-del:hover { border-color: var(--error-csc); color: var(--error-csc); }
   .btn-edit { background: none; border: 1.5px solid #e0e4ee; border-radius: 5px; cursor: pointer; padding: 4px 8px; font-size: 12px; color: var(--text-muted); transition: all .15s; }
@@ -802,9 +823,12 @@ window.exportPDF = async function() {
         <div class="form-group">
           <label>Culpabilidade <span class="req">*</span></label>
           <div class="culpa-group">
-            <button class="culpa-btn" data-val="CSC"       onclick="selectCulpa(this)">CSC</button>
-            <button class="culpa-btn" data-val="Terminal"  onclick="selectCulpa(this)">Terminal</button>
+            <button class="culpa-btn" data-val="CSC"        onclick="selectCulpa(this)">CSC</button>
+            <button class="culpa-btn" data-val="Terminal"   onclick="selectCulpa(this)">Terminal</button>
             <button class="culpa-btn" data-val="Multimodal" onclick="selectCulpa(this)">Multimodal</button>
+            <button class="culpa-btn" data-val="Logistica"  onclick="selectCulpa(this)">Logística</button>
+            <button class="culpa-btn" data-val="Comercial"  onclick="selectCulpa(this)">Comercial</button>
+            <button class="culpa-btn" data-val="Backoffice" onclick="selectCulpa(this)">Backoffice</button>
           </div>
         </div>
         <div class="form-group">
@@ -906,6 +930,9 @@ window.exportPDF = async function() {
           <button class="culpa-btn edit-culpa-btn" data-val="CSC"        onclick="editSelectCulpa(this)">CSC</button>
           <button class="culpa-btn edit-culpa-btn" data-val="Terminal"   onclick="editSelectCulpa(this)">Terminal</button>
           <button class="culpa-btn edit-culpa-btn" data-val="Multimodal" onclick="editSelectCulpa(this)">Multimodal</button>
+          <button class="culpa-btn edit-culpa-btn" data-val="Logistica"  onclick="editSelectCulpa(this)">Logística</button>
+          <button class="culpa-btn edit-culpa-btn" data-val="Comercial"  onclick="editSelectCulpa(this)">Comercial</button>
+          <button class="culpa-btn edit-culpa-btn" data-val="Backoffice" onclick="editSelectCulpa(this)">Backoffice</button>
         </div>
       </div>
       <div class="form-group">
